@@ -1,11 +1,9 @@
 package curl
 
-import "core:bytes"
 import "core:c"
 import "core:fmt"
 import "core:log"
 import "core:mem"
-import "core:slice"
 import "core:strings"
 
 /*
@@ -110,6 +108,7 @@ easySetPost :: proc(easy: ^Easy) {
 easySetUrl :: proc(easy: ^Easy, url: string) {
 	ccurl := strings.clone_to_cstring(url)
 	defer mem.free(rawptr(ccurl))
+
 	code := easy_setopt(easy.cURL, CURLOPT_URL, ccurl)
 	if CURLcode(code) != .CURLE_OK {
 		log.warnf("set url failed, code=%d, msg=%s", code, easy_strerror(code))
@@ -124,7 +123,10 @@ easySetFollowLocation :: proc(easy: ^Easy) {
 }
 
 easySetCaInfo :: proc(easy: ^Easy, caPath: string) {
-	code := easy_setopt(easy.cURL, CURLOPT_CAINFO, strings.clone_to_cstring(caPath))
+	path := strings.clone_to_cstring(caPath)
+	defer mem.free(rawptr(path))
+
+	code := easy_setopt(easy.cURL, CURLOPT_CAINFO)
 	if CURLcode(code) != .CURLE_OK {
 		log.warnf("set ca_info failed, code=%d, msg=%s", code, easy_strerror(code))
 	}
@@ -227,7 +229,6 @@ easySetPostData :: proc(easy: ^Easy, data: []byte) {
 	easySetWriteFunction(easy, easyDefaultWriteFn)
 	easySetWriteData(easy, &easy.buf)
 
-	// data := bytes.buf
 	easySetPostFieldSize(easy, len(data))
 	easySetPostFields(easy, data)
 }
@@ -273,6 +274,7 @@ headerFreeAll :: proc(hl: ^HeaderList) {
 headerAppend :: proc(hl: ^HeaderList, header: string) -> ^HeaderList {
 	cstr := strings.clone_to_cstring(header)
 	defer mem.free(rawptr(cstr))
+
 	hl.inner = slist_append(hl.inner, cstr)
 	return hl
 }
