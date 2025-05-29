@@ -20,18 +20,19 @@ Easy :: struct {
 	headers: ^HeaderList,
 }
 
-// simple get request
+// simple get request, if response's size > 4096, set bufCap to receive the whole data
+// 简单get请求, 如果预料回包比较大的时候, 必须正确设置bufCap，让bufCap大小大于回包总数据大小
 easyGet :: proc(
 	url: string,
 	headers: []string = {},
 	caPath: string = "",
 	verbose: bool = true,
-) -> [dynamic]u8 {
-	easy := easyNew()
+	bufCap: int = 4096,
+) -> []u8 {
+	easy := easyNew(bufCap)
 	defer easyFree(easy)
-	for k, v in headers {
-		easyAddHeader(easy, fmt.aprintf("%s:%s", k, v, newline = true))
-	}
+
+	easyAppendHeaders(easy, headers)
 	easySetUrl(easy, url)
 	if len(caPath) > 0 {
 		easySetCaInfo(easy, caPath)
@@ -47,18 +48,20 @@ easyGet :: proc(
 	if verbose {
 		log.infof("receive data: %s", easy.buf)
 	}
-	return easy.buf
+	return easy.buf[:]
 }
 
-// simple post request
+// simple post request, if response's size > 4096, set bufCap to receive the whole data
+// 简单post请求, 如果预料回包比较大的时候, 必须正确设置bufCap，让bufCap大小大于回包总数据大小
 easyPost :: proc(
 	url: string,
 	headers: []string = {},
 	body: []byte = {},
 	caPath: string = "",
 	verbose: bool = true,
-) -> [dynamic]u8 {
-	easy := easyNew()
+	bufCap: int = 4096,
+) -> []u8 {
+	easy := easyNew(bufCap)
 	defer easyFree(easy)
 	easyAppendHeaders(easy, headers)
 
@@ -77,23 +80,29 @@ easyPost :: proc(
 	if verbose {
 		log.infof("receive data: %s", easy.buf)
 	}
-	return easy.buf
+	return easy.buf[:]
 }
 
-easyNew :: proc() -> ^Easy {
+easyNew :: proc(bufCap: int = 4096) -> ^Easy {
 	easy := new(Easy)
 	easy.cURL = easy_init()
 	easy.headers = headerNew()
 	// 不设置容量会导致比较长的数据不能接收完全
 	// if you don't set cap, the longer data might not receive the whole data
-	// TODO 看起来不是容量的问题，数据太大总会导致数据不能接收完全
-	easy.buf = make([dynamic]u8, 0, 10000)
+
+	// resolve can't receive the whole data
+	arena := &mem.Dynamic_Arena{}
+	mem.dynamic_arena_init(arena)
+	context.allocator = mem.dynamic_arena_allocator(arena)
+
+	easy.buf = make([dynamic]u8, 0, bufCap)
 	return easy
 }
 
 easyFree :: proc(easy: ^Easy) {
 	easy_cleanup(easy.cURL)
 	headerFreeAll(easy.headers)
+
 	delete(easy.buf)
 	free(easy)
 }
@@ -106,10 +115,11 @@ easySetPost :: proc(easy: ^Easy) {
 }
 
 easySetUrl :: proc(easy: ^Easy, url: string) {
-	ccurl := strings.clone_to_cstring(url)
-	defer mem.free(rawptr(ccurl))
+	// 类似这种情况, 看起来mem.free后url也会被正确传递过去, 不确定odin做了什么, 理论上free后url如果是一个地址的话数据应该会被释放
+	url := strings.clone_to_cstring(url)
+	defer mem.free(rawptr(url))
 
-	code := easy_setopt(easy.cURL, CURLOPT_URL, ccurl)
+	code := easy_setopt(easy.cURL, CURLOPT_URL, url)
 	if CURLcode(code) != .CURLE_OK {
 		log.warnf("set url failed, code=%d, msg=%s", code, easy_strerror(code))
 	}
@@ -237,6 +247,7 @@ easyPerform :: proc(easy: ^Easy) {
 	easySetHeader(easy)
 	code := easy_perform(easy.cURL)
 	if CURLcode(code) != .CURLE_OK {
+		// might returns error code 23: Failed writing received data to disk/application, doesn't seem to affect the results
 		log.warnf("perform failed, code=%d, msg=%s", code, easy_strerror(code))
 		return
 	}
