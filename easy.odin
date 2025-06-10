@@ -21,17 +21,17 @@ Easy :: struct {
 }
 
 // simple get request
+// 简单get请求
 easyGet :: proc(
 	url: string,
 	headers: []string = {},
 	caPath: string = "",
 	verbose: bool = true,
-) -> [dynamic]u8 {
-	easy := easyNew()
-	defer easyFree(easy)
-	for k, v in headers {
-		easyAddHeader(easy, fmt.aprintf("%s:%s", k, v, newline = true))
-	}
+	pcap: int = 4096,
+) -> ^Easy {
+	easy := easyNew(pcap)
+
+	easyAppendHeaders(easy, headers)
 	easySetUrl(easy, url)
 	if len(caPath) > 0 {
 		easySetCaInfo(easy, caPath)
@@ -47,19 +47,21 @@ easyGet :: proc(
 	if verbose {
 		log.infof("receive data: %s", easy.buf)
 	}
-	return easy.buf
+	return easy
 }
 
 // simple post request
+// 简单post请求
 easyPost :: proc(
 	url: string,
 	headers: []string = {},
 	body: []byte = {},
 	caPath: string = "",
 	verbose: bool = true,
-) -> [dynamic]u8 {
-	easy := easyNew()
-	defer easyFree(easy)
+	pcap: int = 4096,
+) -> ^Easy {
+	easy := easyNew(pcap)
+
 	easyAppendHeaders(easy, headers)
 
 	easySetUrl(easy, url)
@@ -77,88 +79,69 @@ easyPost :: proc(
 	if verbose {
 		log.infof("receive data: %s", easy.buf)
 	}
-	return easy.buf
+	return easy
 }
 
-easyNew :: proc() -> ^Easy {
+easyNew :: proc(pcap: int = 4096) -> ^Easy {
 	easy := new(Easy)
 	easy.cURL = easy_init()
 	easy.headers = headerNew()
-	// 不设置容量会导致比较长的数据不能接收完全
-	// if you don't set cap, the longer data might not receive the whole data
-	// TODO 看起来不是容量的问题，数据太大总会导致数据不能接收完全
-	easy.buf = make([dynamic]u8, 0, 10000)
+
+	easy.buf = make([dynamic]u8, 0, pcap)
 	return easy
 }
 
 easyFree :: proc(easy: ^Easy) {
 	easy_cleanup(easy.cURL)
 	headerFreeAll(easy.headers)
+
 	delete(easy.buf)
 	free(easy)
 }
 
-easySetPost :: proc(easy: ^Easy) {
-	code := easy_setopt(easy.cURL, CURLOPT_POST, 1)
+easyOkOrWarn :: proc(code: int, procName: string) {
 	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set post failed, code=%d, msg=%s", code, easy_strerror(code))
+		log.warnf("set %s failed, code=%d, msg=%s", procName, code, easy_strerror(code))
 	}
+}
+
+easySetPost :: proc(easy: ^Easy) {
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_POST, 1), #procedure)
 }
 
 easySetUrl :: proc(easy: ^Easy, url: string) {
-	ccurl := strings.clone_to_cstring(url)
-	defer mem.free(rawptr(ccurl))
+	// 类似这种情况, 看起来mem.free后url也会被正确传递过去, 不确定odin做了什么, 理论上free后url如果是一个地址的话数据应该会被释放
+	url := strings.clone_to_cstring(url)
+	defer mem.free(rawptr(url))
 
-	code := easy_setopt(easy.cURL, CURLOPT_URL, ccurl)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set url failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_URL, url), #procedure)
 }
 
 easySetFollowLocation :: proc(easy: ^Easy) {
-	code := easy_setopt(easy.cURL, CURLOPT_FOLLOWLOCATION, 1)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set follow_location failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_FOLLOWLOCATION, 1), #procedure)
 }
 
 easySetCaInfo :: proc(easy: ^Easy, caPath: string) {
 	path := strings.clone_to_cstring(caPath)
 	defer mem.free(rawptr(path))
 
-	code := easy_setopt(easy.cURL, CURLOPT_CAINFO)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set ca_info failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_CAINFO), #procedure)
 }
 
 easySetVerbose :: proc(easy: ^Easy) {
-	code := easy_setopt(easy.cURL, CURLOPT_VERBOSE, 1)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set verbose failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_VERBOSE, 1), #procedure)
 }
 
 easySetTimeoutMS :: proc(easy: ^Easy, timeout: u64) {
-	code := easy_setopt(easy.cURL, CURLOPT_TIMEOUT_MS, timeout)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set timeout_ms failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_TIMEOUT_MS, timeout), #procedure)
 }
 
 easySetTimeout :: proc(easy: ^Easy, timeout: u64) {
-	code := easy_setopt(easy.cURL, CURLOPT_TIMEOUT, timeout)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set timeout failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_TIMEOUT, timeout), #procedure)
 }
 
 easySetHeader :: proc(easy: ^Easy) {
-	code := easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, easy.headers.inner)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set header failed, code=%d, msg=%s", code, easy_strerror(code))
-		return
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, easy.headers.inner), #procedure)
 }
 
 easySetWriteFunction :: proc(
@@ -170,39 +153,23 @@ easySetWriteFunction :: proc(
 		output: ^[dynamic]u8,
 	) -> c.size_t,
 ) {
-	code := easy_setopt(easy.cURL, CURLOPT_WRITEFUNCTION, writeFn)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set write_function failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_WRITEFUNCTION, writeFn), #procedure)
 }
 
 easySetWriteData :: proc(easy: ^Easy, writeData: ^[dynamic]u8) {
-	code := easy_setopt(easy.cURL, CURLOPT_WRITEDATA, writeData)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set write_data failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_WRITEDATA, writeData), #procedure)
 }
 
 easySetPostFieldSize :: proc(easy: ^Easy, size: uint) {
-	code := easy_setopt(easy.cURL, CURLOPT_POSTFIELDSIZE, size)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set post_field_size failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_POSTFIELDSIZE, size), #procedure)
 }
 
 easySetPostFields :: proc(easy: ^Easy, data: []byte) {
-	code := easy_setopt(easy.cURL, CURLOPT_POSTFIELDS, data)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("set post_field failed, code=%d, msg=%s", code, easy_strerror(code))
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_POSTFIELDS, data), #procedure)
 }
 
 easyClearHeader :: proc(easy: ^Easy) {
-	code := easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, nil)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("clear header failed, code=%d, msg=%s", code, easy_strerror(code))
-		return
-	}
+	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, nil), #procedure)
 	headerFreeAll(easy.headers)
 }
 
@@ -235,11 +202,8 @@ easySetPostData :: proc(easy: ^Easy, data: []byte) {
 
 easyPerform :: proc(easy: ^Easy) {
 	easySetHeader(easy)
-	code := easy_perform(easy.cURL)
-	if CURLcode(code) != .CURLE_OK {
-		log.warnf("perform failed, code=%d, msg=%s", code, easy_strerror(code))
-		return
-	}
+
+	easyOkOrWarn(easy_perform(easy.cURL), #procedure)
 }
 
 easyDefaultWriteFn :: proc(
@@ -251,9 +215,10 @@ easyDefaultWriteFn :: proc(
 	if output == nil {return 0}
 	dataLen := size * nitems
 	data := (string(buffer))[:dataLen]
-	// fmt.printfln("size=%d, nitems=%d, buf=%v, output=%v", size, nitems, data, output == nil)
+	// fmt.printfln("size=%d, nitems=%d, buf=%v", size, nitems, data)
+	// fmt.printfln("size=%d, nitems=%d", size, nitems)
 	append(output, data)
-	return len(output)
+	return dataLen
 }
 
 HeaderList :: struct {
