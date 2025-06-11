@@ -1,9 +1,7 @@
 package curl
 
 import "core:c"
-import "core:fmt"
 import "core:log"
-import "core:mem"
 import "core:strings"
 
 /*
@@ -110,9 +108,9 @@ easySetPost :: proc(easy: ^Easy) {
 }
 
 easySetUrl :: proc(easy: ^Easy, url: string) {
-	// 类似这种情况, 看起来mem.free后url也会被正确传递过去, 不确定odin做了什么, 理论上free后url如果是一个地址的话数据应该会被释放
+	// 类似这种情况, 看起来delete url也会被正确传递过去, 不确定odin做了什么, 理论上delete后url如果是一个地址的话数据应该会被释放
 	url := strings.clone_to_cstring(url)
-	defer mem.free(rawptr(url))
+	defer delete(url)
 
 	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_URL, url), #procedure)
 }
@@ -123,7 +121,7 @@ easySetFollowLocation :: proc(easy: ^Easy) {
 
 easySetCaInfo :: proc(easy: ^Easy, caPath: string) {
 	path := strings.clone_to_cstring(caPath)
-	defer mem.free(rawptr(path))
+	defer delete(path)
 
 	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_CAINFO), #procedure)
 }
@@ -215,7 +213,7 @@ easyDefaultWriteFn :: proc(
 	if output == nil {return 0}
 	dataLen := size * nitems
 	data := (string(buffer))[:dataLen]
-	// fmt.printfln("size=%d, nitems=%d, buf=%v", size, nitems, data)
+	// fmt.printfln("size=%d, nitems=%d, buf=%s", size, nitems, data)
 	// fmt.printfln("size=%d, nitems=%d", size, nitems)
 	append(output, data)
 	return dataLen
@@ -238,7 +236,7 @@ headerFreeAll :: proc(hl: ^HeaderList) {
 
 headerAppend :: proc(hl: ^HeaderList, header: string) -> ^HeaderList {
 	cstr := strings.clone_to_cstring(header)
-	defer mem.free(rawptr(cstr))
+	defer delete(cstr)
 
 	hl.inner = slist_append(hl.inner, cstr)
 	return hl
