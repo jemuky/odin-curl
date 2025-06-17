@@ -20,18 +20,10 @@ libcurl 的odin语言绑定
 4. (可选)设置log的过程(函数)(`core:log`)用来打印一些日志, 默认log不做任何事, 当前仓库使用了`log.warnf`, 在`easyGet`和`easyPost`时指定`verbose`参数时使用了`log.infof`
 5. 开始使用, 见下面例子
 ```odin
-// 设置日志过程
-my_logger_proc :: proc(
-	data: rawptr,
-	level: runtime.Logger_Level,
-	text: string,
-	options: runtime.Logger_Options,
-	location := #caller_location,
-) {
-	fmt.printfln(text)
-}
 // 设置日志
-context.logger.procedure = my_logger_proc
+logger := log.create_console_logger()
+defer log.destroy_console_logger(logger)
+context.logger = logger
 
 // 请求结构
 Query :: struct {

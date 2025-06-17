@@ -20,18 +20,10 @@ They are based on curl 8.8.0 version.
 4. (optional)set log procedure(`core:log`) to print logs
 5. get start, for example:  
 ```odin
-// set logger procedure
-my_logger_proc :: proc(
-	data: rawptr,
-	level: runtime.Logger_Level,
-	text: string,
-	options: runtime.Logger_Options,
-	location := #caller_location,
-) {
-	fmt.printfln(text)
-}
-// set current logger
-context.logger.procedure = my_logger_proc
+// set logger
+logger := log.create_console_logger()
+defer log.destroy_console_logger(logger)
+context.logger = logger
 
 Query :: struct {
 	taskId: string `json:"task_id,omitempty"`,
