@@ -35,7 +35,7 @@ q: Query = {
 }
 data, _ := json.marshal(q)
 // post request
-easy := curl.easyPost(
+easy := curl.Easy_post(
   "https://xxx/xxx/xxx",
   {"Content-Type: application/json"},
   body = data,
@@ -43,7 +43,7 @@ easy := curl.easyPost(
   verbose = false,
   pcap = 2048, // pre-set capicity, default 4096
 )
-defer curl.easyFree(easy)
+defer curl.Easy_free(easy)
 // decode response body
 res := Res{}
 err := json.unmarshal(easy.buf[:], &res)

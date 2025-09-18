@@ -20,28 +20,28 @@ Easy :: struct {
 
 // simple get request
 // 简单get请求
-easyGet :: proc(
+Easy_get :: proc(
 	url: string,
 	headers: []string = {},
 	caPath: string = "",
 	verbose: bool = true,
 	pcap: int = 4096,
 ) -> ^Easy {
-	easy := easyNew(pcap)
+	easy := Easy_new(pcap)
 
-	easyAppendHeaders(easy, headers)
-	easySetUrl(easy, url)
+	Easy_append_headers(easy, headers)
+	Easy_set_url(easy, url)
 	if len(caPath) > 0 {
-		easySetCaInfo(easy, caPath)
+		Easy_set_ca_info(easy, caPath)
 	} else {
 		easy_setopt(easy.cURL, CURLOPT_SSL_VERIFYPEER, 0)
 		easy_setopt(easy.cURL, CURLOPT_SSL_VERIFYHOST, 0)
 	}
-	easySetGetData(easy)
+	Easy_set_get_data(easy)
 	if verbose {
-		easySetVerbose(easy)
+		Easy_verbose(easy)
 	}
-	easyPerform(easy)
+	Easy_perform(easy)
 	if verbose {
 		log.infof("receive data: %s", easy.buf)
 	}
@@ -50,7 +50,7 @@ easyGet :: proc(
 
 // simple post request
 // 简单post请求
-easyPost :: proc(
+Easy_post :: proc(
 	url: string,
 	headers: []string = {},
 	body: []byte = {},
@@ -58,91 +58,91 @@ easyPost :: proc(
 	verbose: bool = true,
 	pcap: int = 4096,
 ) -> ^Easy {
-	easy := easyNew(pcap)
+	easy := Easy_new(pcap)
 
-	easyAppendHeaders(easy, headers)
+	Easy_append_headers(easy, headers)
 
-	easySetUrl(easy, url)
+	Easy_set_url(easy, url)
 	if len(caPath) > 0 {
-		easySetCaInfo(easy, caPath)
+		Easy_set_ca_info(easy, caPath)
 	} else {
 		easy_setopt(easy.cURL, CURLOPT_SSL_VERIFYPEER, 0)
 		easy_setopt(easy.cURL, CURLOPT_SSL_VERIFYHOST, 0)
 	}
-	easySetPostData(easy, body)
+	Easy_set_post_data(easy, body)
 	if verbose {
-		easySetVerbose(easy)
+		Easy_verbose(easy)
 	}
-	easyPerform(easy)
+	Easy_perform(easy)
 	if verbose {
 		log.infof("receive data: %s", easy.buf)
 	}
 	return easy
 }
 
-easyNew :: proc(pcap: int = 4096) -> ^Easy {
+Easy_new :: proc(pcap: int = 4096) -> ^Easy {
 	easy := new(Easy)
 	easy.cURL = easy_init()
-	easy.headers = headerNew()
+	easy.headers = Header_new()
 
 	easy.buf = make([dynamic]u8, 0, pcap)
 	return easy
 }
 
-easyFree :: proc(easy: ^Easy) {
+Easy_free :: proc(easy: ^Easy) {
 	easy_cleanup(easy.cURL)
-	headerFreeAll(easy.headers)
+	Header_free_all(easy.headers)
 
 	delete(easy.buf)
 	free(easy)
 }
 
-easyOkOrWarn :: proc(code: int, procName: string) {
+easy_ok_or_warn :: proc(code: int, procName: string) {
 	if CURLcode(code) != .CURLE_OK {
 		log.warnf("set %s failed, code=%d, msg=%s", procName, code, easy_strerror(code))
 	}
 }
 
-easySetPost :: proc(easy: ^Easy) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_POST, 1), #procedure)
+Easy_set_post :: proc(easy: ^Easy) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_POST, 1), #procedure)
 }
 
-easySetUrl :: proc(easy: ^Easy, url: string) {
+Easy_set_url :: proc(easy: ^Easy, url: string) {
 	// 类似这种情况, 看起来delete url也会被正确传递过去, 不确定odin做了什么, 理论上delete后url如果是一个地址的话数据应该会被释放
 	url := strings.clone_to_cstring(url)
 	defer delete(url)
 
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_URL, url), #procedure)
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_URL, url), #procedure)
 }
 
-easySetFollowLocation :: proc(easy: ^Easy) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_FOLLOWLOCATION, 1), #procedure)
+Easy_set_follow_location :: proc(easy: ^Easy) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_FOLLOWLOCATION, 1), #procedure)
 }
 
-easySetCaInfo :: proc(easy: ^Easy, caPath: string) {
+Easy_set_ca_info :: proc(easy: ^Easy, caPath: string) {
 	path := strings.clone_to_cstring(caPath)
 	defer delete(path)
 
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_CAINFO), #procedure)
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_CAINFO), #procedure)
 }
 
-easySetVerbose :: proc(easy: ^Easy) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_VERBOSE, 1), #procedure)
+Easy_verbose :: proc(easy: ^Easy) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_VERBOSE, 1), #procedure)
 }
 
-easySetTimeoutMS :: proc(easy: ^Easy, timeout: u64) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_TIMEOUT_MS, timeout), #procedure)
+Easy_set_timeout_ms :: proc(easy: ^Easy, timeout: u64) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_TIMEOUT_MS, timeout), #procedure)
 }
 
-easySetTimeout :: proc(easy: ^Easy, timeout: u64) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_TIMEOUT, timeout), #procedure)
+Easy_set_timeout :: proc(easy: ^Easy, timeout: u64) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_TIMEOUT, timeout), #procedure)
 }
 
-easySetHeader :: proc(easy: ^Easy) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, easy.headers.inner), #procedure)
+Easy_set_header :: proc(easy: ^Easy) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, easy.headers.inner), #procedure)
 }
 
-easySetWriteFunction :: proc(
+Easy_set_write_function :: proc(
 	easy: ^Easy,
 	writeFn: proc(
 		buffer: cstring,
@@ -151,60 +151,60 @@ easySetWriteFunction :: proc(
 		output: ^[dynamic]u8,
 	) -> c.size_t,
 ) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_WRITEFUNCTION, writeFn), #procedure)
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_WRITEFUNCTION, writeFn), #procedure)
 }
 
-easySetWriteData :: proc(easy: ^Easy, writeData: ^[dynamic]u8) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_WRITEDATA, writeData), #procedure)
+Easy_set_write_data :: proc(easy: ^Easy, writeData: ^[dynamic]u8) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_WRITEDATA, writeData), #procedure)
 }
 
-easySetPostFieldSize :: proc(easy: ^Easy, size: uint) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_POSTFIELDSIZE, size), #procedure)
+Easy_set_post_field_size :: proc(easy: ^Easy, size: uint) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_POSTFIELDSIZE, size), #procedure)
 }
 
-easySetPostFields :: proc(easy: ^Easy, data: []byte) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_POSTFIELDS, data), #procedure)
+Easy_set_post_fields :: proc(easy: ^Easy, data: []byte) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_POSTFIELDS, data), #procedure)
 }
 
-easyClearHeader :: proc(easy: ^Easy) {
-	easyOkOrWarn(easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, nil), #procedure)
-	headerFreeAll(easy.headers)
+Easy_clear_header :: proc(easy: ^Easy) {
+	easy_ok_or_warn(easy_setopt(easy.cURL, CURLOPT_HTTPHEADER, nil), #procedure)
+	Header_free_all(easy.headers)
 }
 
-easyAddHeader :: proc(easy: ^Easy, header: string) {
-	headerAppend(easy.headers, header)
+Easy_add_header :: proc(easy: ^Easy, header: string) {
+	Header_append(easy.headers, header)
 }
 
-easyAppendHeaders :: proc(easy: ^Easy, headers: []string) {
+Easy_append_headers :: proc(easy: ^Easy, headers: []string) {
 	for header in headers {
-		easyAddHeader(easy, header)
+		Easy_add_header(easy, header)
 	}
 }
 
-easySetGetData :: proc(easy: ^Easy) {
-	easySetFollowLocation(easy)
-	easySetWriteFunction(easy, easyDefaultWriteFn)
-	easySetWriteData(easy, &easy.buf)
+Easy_set_get_data :: proc(easy: ^Easy) {
+	Easy_set_follow_location(easy)
+	Easy_set_write_function(easy, easy_default_write_fn)
+	Easy_set_write_data(easy, &easy.buf)
 }
 
-easySetPostData :: proc(easy: ^Easy, data: []byte) {
-	easySetPost(easy)
-	easySetFollowLocation(easy)
+Easy_set_post_data :: proc(easy: ^Easy, data: []byte) {
+	Easy_set_post(easy)
+	Easy_set_follow_location(easy)
 
-	easySetWriteFunction(easy, easyDefaultWriteFn)
-	easySetWriteData(easy, &easy.buf)
+	Easy_set_write_function(easy, easy_default_write_fn)
+	Easy_set_write_data(easy, &easy.buf)
 
-	easySetPostFieldSize(easy, len(data))
-	easySetPostFields(easy, data)
+	Easy_set_post_field_size(easy, len(data))
+	Easy_set_post_fields(easy, data)
 }
 
-easyPerform :: proc(easy: ^Easy) {
-	easySetHeader(easy)
+Easy_perform :: proc(easy: ^Easy) {
+	Easy_set_header(easy)
 
-	easyOkOrWarn(easy_perform(easy.cURL), #procedure)
+	easy_ok_or_warn(easy_perform(easy.cURL), #procedure)
 }
 
-easyDefaultWriteFn :: proc(
+easy_default_write_fn :: proc(
 	buffer: cstring,
 	size: c.size_t,
 	nitems: c.size_t,
@@ -223,18 +223,18 @@ HeaderList :: struct {
 	inner: curl_slist,
 }
 
-headerNew :: proc() -> ^HeaderList {
+Header_new :: proc() -> ^HeaderList {
 	hl := new(HeaderList)
 	hl.inner = nil
 	return hl
 }
 
-headerFreeAll :: proc(hl: ^HeaderList) {
+Header_free_all :: proc(hl: ^HeaderList) {
 	slist_free_all(hl.inner)
 	free(hl)
 }
 
-headerAppend :: proc(hl: ^HeaderList, header: string) -> ^HeaderList {
+Header_append :: proc(hl: ^HeaderList, header: string) -> ^HeaderList {
 	cstr := strings.clone_to_cstring(header)
 	defer delete(cstr)
 

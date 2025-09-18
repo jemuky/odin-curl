@@ -36,7 +36,7 @@ q: Query = {
 // 请求编码为json
 data, _ := json.marshal(q)
 // post请求
-easy := curl.easyPost(
+easy := curl.Easy_post(
   "https://xxx/xxx/xxx",
   {"Content-Type: application/json"},
   body = data,
@@ -44,7 +44,7 @@ easy := curl.easyPost(
   verbose = false,
   pcap = 2048, // 预先设置容量，默认4096
 )
-defer curl.easyFree(easy)
+defer curl.Easy_free(easy)
 // 解码
 res := Res{}
 err := json.unmarshal(easy.buf[:], &res)
